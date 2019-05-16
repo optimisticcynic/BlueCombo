@@ -32,32 +32,12 @@
 
 
 using namespace std;
-const double phistarBins[] = {0.000, 0.004, 0.008, 0.012, 0.016, 0.020, 0.024, 0.029, 0.034, 0.039, 0.045, 0.052, 0.057, 0.064, 0.072, 0.081, 0.091, 0.102, 0.114, 0.128, 0.145, 0.165, 0.189, 0.219, 0.258, 0.312, 0.391, 0.524, 0.695, 0.918, 1.153, 1.496, 1.947, 2.522, 3.277};
+const double phistarBins[] = {0.000, 0.004, 0.008, 0.012, 0.016, 0.020, 0.024, 0.029, 0.034, 0.039, 0.045, 0.051, 0.057, 0.064, 0.072, 0.081, 0.091, 0.102, 0.114, 0.128, 0.145, 0.165, 0.189, 0.219, 0.258, 0.312, 0.391, 0.524, 0.695, 0.918, 1.153, 1.496, 1.947, 2.522, 3.277};
 size_t nphistar = (sizeof (phistarBins) / sizeof (phistarBins[0])) - 1;
 const double yBins[] = {0.0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4};
 size_t ny = (sizeof (yBins) / sizeof (yBins[0])) - 1;
 size_t nbins = nphistar*ny;
 static const Int_t NumEst = 408;
-
-void HeapUser(double**& Array, Int_t Dimension) {
-    //    Array = (double **) malloc(Dimension * sizeof (double *));
-    //    for (Int_t YaxisBin = 0; YaxisBin < Dimension; YaxisBin++) {
-    //        Array[YaxisBin] = (double *) malloc(Dimension * sizeof (double));
-    //        for (Int_t XaxisBin = 0; XaxisBin < Dimension; XaxisBin++) {
-    //            Array[XaxisBin][YaxisBin]=0;
-    //        }
-    //    }
-    Dimension = 68;
-    Array = new double*[Dimension];
-    for (Int_t YaxisBin = 0; YaxisBin < Dimension; YaxisBin++) {
-        Array[YaxisBin] = new double[Dimension];
-        for (Int_t XaxisBin = 0; XaxisBin < Dimension; XaxisBin++) {
-
-        }
-    }
-    cout << "Sanity check " << Array[69] << endl;
-
-}
 
 void CorrilationMatrixMaker(double Array[][NumEst], TMatrixD CovMatrix, bool IsQCD = false) {
     for (size_t Ybin = 0; Ybin < nbins * (2 - IsQCD); Ybin++) {
@@ -91,7 +71,7 @@ void symmetricMaker(double Array[][408]) {
     }
 }
 
-void ElectPlusMuon2D(bool DoNorm = false) {
+void ElectPlusMuon2D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
 
 
     static const Int_t NumUnc = 8;
@@ -140,15 +120,20 @@ void ElectPlusMuon2D(bool DoNorm = false) {
     TMatrixD* CovM_pileup = (TMatrixD*) Original.Get("CovM_pileup");
     TMatrixD* CovM_pt = (TMatrixD*) Original.Get("CovM_pt");
     TMatrixD* CovM_lumi = (TMatrixD*) Original.Get("CovM_lumi");
-//    (*CovM_stat) *= 0;
-    bool killElectrons=false;//Kills the eff uncertaitny for either of these
-    bool KillMuon=false;
-    for (size_t binx = 0; binx < NumObs; binx++)
-            for (size_t biny = 0; biny < NumObs; biny++) {
-                if(killElectrons)(*CovM_eff)(binx,biny)=0;
-                if(KillMuon)(*CovM_eff)(binx+NumObs,biny+NumObs)=0;
-            }
-    
+    //    (*CovM_stat) *= 0;
+    for (size_t binx = 0; binx < NumEst; binx++)
+        for (size_t biny = 0; biny < NumEst; biny++) {
+            if (binx == biny)continue;
+            if (RemoveCorrilation == 0)(*CovM_stat)(binx, biny) = 0;
+            if (RemoveCorrilation == 1)(*CovM_mcstat)(binx, biny) = 0;
+            if (RemoveCorrilation == 2)(*CovM_eff)(binx, biny) = 0;
+            if (RemoveCorrilation == 3)(*CovM_bg_tt)(binx, biny) = 0;
+            if (RemoveCorrilation == 4)(*CovM_bg_di)(binx, biny) = 0;
+            if (RemoveCorrilation == 5)(*CovM_bg_qcd)(binx, biny) = 0;
+            if (RemoveCorrilation == 6)(*CovM_pileup)(binx, biny) = 0;
+            if (RemoveCorrilation == 7)(*CovM_pt)(binx, biny) = 0;
+        }
+
     NamUnc[0].Format("stat");
     NamUnc[1].Format("mcstat");
     NamUnc[2].Format("eff");
@@ -247,8 +232,13 @@ void ElectPlusMuon2D(bool DoNorm = false) {
 
     double Results[NumObs][NumUnc + 1];
     TMatrixD* CovarianceResults = new TMatrixD(NumObs, NumObs);
+    TMatrixD MatrixResults(NumObs, NumUnc + 1);
+    TMatrixD* Weights = new TMatrixD(NumEst, NumObs);
+    myBlue->GetWeight(Weights);
+
     myBlue->GetResult(Results[0]);
     myBlue->GetCovRes(CovarianceResults);
+    myBlue->GetResult(&MatrixResults);
 
 
     TGraphAsymmErrors ElectronPlot(NumObs);
@@ -300,38 +290,30 @@ void ElectPlusMuon2D(bool DoNorm = false) {
 
 
     string filename;
-    if (DoNorm)filename = "Results/Comb_Norm_UsingBlue2D.root";
-    else filename = "Results/Comb_Abs_UsingBlue2D.root";
-
+    if (RemoveCorrilation == -1) {
+        if (DoNorm)filename = "Results/Comb_Norm_UsingBlue2D.root";
+        else filename = "Results/Comb_Abs_UsingBlue2Dffcor.root"; //Weird thing getting rid of it
+    } else if (RemoveCorrilation == 2) {
+        if (DoNorm)filename = "Results/Comb_Norm_UsingBlue2DRemovedEffcor.root";
+        else filename = "Results/Comb_Abs_UsingBlue2DRemovedEffcor.root";
+    } else {
+        cout << "To do doing an option that I shouldn't be yet so haven't asdfasdf " << endl;
+        return;
+    }
     TFile ResultFile(filename.c_str(), "recreate");
     ResultFile.cd();
     ElectronPlot.Write("Electron");
     MuonPlot.Write("Muons");
     BlueCombGraph.Write("h_Comb");
     CovarianceResults->Write("TotalCovarianceMatrix");
+    MatrixResults.Write("ResultsMatrix");
+    Weights->Write("Weights");
+
 
     TH2D SanityCheckinitial("corrilationHistoInitial", "corrilationHistoInitial", NumEst, 0, NumEst, NumEst, 0, NumEst);
     TH2D SanityCheckEnd("corrilationHistoEnd", "corrilationHistoEnd", NumObs, 0, NumObs, NumObs, 0, NumObs);
 
-    vector<TH2D*> OrigninalCorrilationMatrixs;
-    size_t numberofbins = NumObs - 3;
-    OrigninalCorrilationMatrixs.push_back(new TH2D("Stat_error", "Stat_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("MCStat_error", "MCStat_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("eff_Stat_error", "eff_Stat_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("bg_tt_error", "bg_tt_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("bg_di_error", "bg_di_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("bg_qcd_error", "bg_qcd_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("pileup_error", "pileup_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
-    OrigninalCorrilationMatrixs.push_back(new TH2D("pt_error", "pt_error", numberofbins, 0, numberofbins, numberofbins, 0, numberofbins));
 
-    for (size_t Error = 0; Error < 8; Error++)
-        for (size_t binx = 0; binx < numberofbins; binx++)
-            for (size_t biny = 0; biny < numberofbins; biny++) {
-                double xx, xy, yx, yy;
-                FullPlot->GetPoint(binx, xx, xy);
-                FullPlot->GetPoint(biny, yx, yy);
-                OrigninalCorrilationMatrixs[Error]->SetBinContent(binx, biny, AllCovs[Error](binx, biny) / xy / yy);
-            }
 
 
 
@@ -353,7 +335,9 @@ void ElectPlusMuon2D(bool DoNorm = false) {
             SanityCheckinitial.SetBinContent(binx + 1, biny + 1, OldCovarianMatrixTotal(binx, biny) / sqrt(OldCovarianMatrixTotal(binx, binx) * OldCovarianMatrixTotal(biny, biny)));
             SanityCheckEnd.SetBinContent(binx + 1, biny + 1, (*CovarianceResults)(binx, biny) / sqrt((*CovarianceResults)(binx, binx)* (*CovarianceResults)(biny, biny)));
         }
-
+    TH1D ChiSquared("ChiSquared", "ChiSquared", 1, 0, 1);
+    ChiSquared.SetBinContent(1, myBlue->GetChiq());
+    ChiSquared.Write();
     //SanityCheck.Write();
     ResultFile.Write();
     delete myBlue;
@@ -477,9 +461,9 @@ void Plotter(bool DoNorm = true) {
             if (i == 5)r_data[i]->GetYaxis()->SetRangeUser(0.88, 1.12);
         } else {
             r_data[i]->GetYaxis()->SetRangeUser(0.94, 1.06);
-            if (i == 4)r_data[i]->GetYaxis()->SetRangeUser(0.70, 1.3);
+            if (i == 4)r_data[i]->GetYaxis()->SetRangeUser(0.88, 1.12);
             if (i == 5) {
-                r_data[i]->GetYaxis()->SetRangeUser(0.63, 1.37);
+                r_data[i]->GetYaxis()->SetRangeUser(0.88, 1.12);
                 r_data[i]->GetYaxis()->SetNdivisions(505);
             }
         }
@@ -514,49 +498,50 @@ void Plotter(bool DoNorm = true) {
         ElectronCollection[i]->SetLineColor(kBlue);
         ElectronCollection[i]->SetMarkerStyle(23);
         ElectronCollection[i]->Draw("PEsame");
+        Info[i]->RedrawAxis();
     }
 
     FinalPhiRatio->cd(0);
     TLatex mark;
     mark.SetTextSize(TextSize);
     mark.SetNDC(kTRUE);
-    mark.DrawLatex(.766, .974, "19.7 fb^{-1} (8 TeV)");
-    mark.DrawLatex(0.097, .974, "CMS");
+    mark.DrawLatex(.766, .934, "19.7 fb^{-1} (8 TeV)");
+    mark.DrawLatex(0.097, .934, "CMS");
     TLatex mark2;
     mark2.SetTextSize(TextSize);
     mark2.SetTextFont(42);
     mark2.SetNDC(kTRUE);
     if (DoNorm) {
         mark2.DrawLatex(.12, .86, "|y| < 0.4");
-        mark2.DrawLatex(.12, .73, "0.4 < |y| < 0.8");
-        mark2.DrawLatex(.12, .58, "0.8 < |y| < 1.2");
-        mark2.DrawLatex(.12, .44, "1.2 < |y| < 1.6");
-        mark2.DrawLatex(.12, .30, "1.6 < |y| < 2.0");
-        mark2.DrawLatex(.12, .15, "2.0 < |y| < 2.4");
+        mark2.DrawLatex(.12, .73, "0.4 #leq |y| < 0.8");
+        mark2.DrawLatex(.12, .58, "0.8 #leq |y| < 1.2");
+        mark2.DrawLatex(.12, .44, "1.2 #leq |y| < 1.6");
+        mark2.DrawLatex(.12, .30, "1.6 #leq |y| < 2.0");
+        mark2.DrawLatex(.12, .15, "2.0 #leq |y| #leq 2.4");
         mark2.SetTextAngle(90);
         mark2.SetTextSize(TextSize * 1.2);
-        mark2.DrawLatex(.05, .28, "Data/Blue ");
+        mark2.DrawLatex(.05, .4, "Separate/Combined ");
     } else if (true) {
         mark2.DrawLatex(.12, .86, "|y| < 0.4");
-        mark2.DrawLatex(.12, .73, "0.4 < |y| < 0.8");
-        mark2.DrawLatex(.12, .58, "0.8 < |y| < 1.2");
-        mark2.DrawLatex(.12, .44, "1.2 < |y| < 1.6");
-        mark2.DrawLatex(.12, .30, "1.6 < |y| < 2.0");
-        mark2.DrawLatex(.12, .15, "2.0 < |y| < 2.4");
+        mark2.DrawLatex(.12, .73, "0.4 #leq |y| < 0.8");
+        mark2.DrawLatex(.12, .58, "0.8 #leq |y| < 1.2");
+        mark2.DrawLatex(.12, .44, "1.2 #leq |y| < 1.6");
+        mark2.DrawLatex(.12, .30, "1.6 #leq |y| < 2.0");
+        mark2.DrawLatex(.12, .15, "2.0 #leq |y| #leq 2.4");
         mark2.SetTextAngle(90);
         mark2.SetTextSize(TextSize * 1.2);
-        mark2.DrawLatex(.05, .36, "Data/Blue");
+        mark2.DrawLatex(.05, .4, "Separate/Combined");
     }
 
     FinalPhiRatio->cd(1);
-    TLegend* leg2 = new TLegend(0.0975, 0.8865, 0.9, 0.97);
+    TLegend* leg2 = new TLegend(0.0975, 0.8865, 0.9, 0.93);
     leg2->SetNColumns(3);
     leg2->SetFillStyle(0);
     //leg2->SetBorderSize(1);
     leg2->SetLineWidth(1);
     leg2->SetTextFont(22);
     leg2->SetTextSize(TextSize);
-    leg2->AddEntry(r_data[0], "Blue Combined Z #rightarrow ll", "F");
+    leg2->AddEntry(r_data[0], "BLUE Combined", "F");
     leg2->AddEntry(MuonCollection[0], "2012 data Z #rightarrow #mu#mu", "P");
     leg2->AddEntry(ElectronCollection[0], "2012 Data Z #rightarrow ee", "P");
     leg2->Draw();
@@ -565,14 +550,114 @@ void Plotter(bool DoNorm = true) {
     if (DoNorm)PlotName = "Plots/TwoDNorm";
     else PlotName = "Plots/TwoDAbs";
     string Withtype = PlotName + ".pdf";
+    FinalPhiRatio->cd(0);
+    FinalPhiRatio->RedrawAxis();
     FinalPhiRatio->Print(Withtype.c_str());
+    Withtype = PlotName + ".png";
+    FinalPhiRatio->Print(Withtype.c_str());
+}
+
+void Combiner() {//HACK HACKEDY HACK HACK HAck so the story is that We don't like the eff causing a weird offset so instead we are now going to combine 2 results
+    Int_t NumObs = nphistar*ny;
+    //    TFile WithEffCorFile("Results/Comb_Abs_UsingBlue2Dffcor.root", "read");
+    //    TH1D* ChiSquared = (TH1D*) WithEffCorFile.Get("ChiSquared");
+    //    TH1D myChiSquared("Chi2", "Chi2", 1, 0, 1);
+    //    myChiSquared.SetBinContent(1, ChiSquared->GetBinContent(1));
+    //    TGraphAsymmErrors* Electron = (TGraphAsymmErrors*) WithEffCorFile.Get("Electron");
+    //    if (!Electron) cout << "Missing electrons" << endl;
+    //    TGraphAsymmErrors* Muons = (TGraphAsymmErrors*) WithEffCorFile.Get("Muons");
+    //    if (!Muons) cout << "Missing Muons" << endl;
+    //    TMatrixD* TotalCovarianceMatrix = (TMatrixD*) WithEffCorFile.Get("TotalCovarianceMatrix");
+    //    TMatrixD MatrixResults = *((TMatrixD*) WithEffCorFile.Get("ResultsMatrix"));
+
+    //    cout << ChiSquared->GetBinContent(1);
+    //    WithEffCorFile.Close();
+
+    std::string OrignialFileLocation = "~/work/HomeWork/Phistar/CombineElectWithMu/EPlusMuFileV2/Comb_ForBlue_Abs_2D_Born.root"; //Grabbing efficency uncertainty shit
+    TFile Original(OrignialFileLocation.c_str());
+    TMatrixD CovM_eff = *((TMatrixD*) Original.Get("CovM_eff"));
+    TMatrixD EffUncertainty(1, NumObs);
+
+
+
+
+
+    TFile NoEffCorFile("Results/Comb_Abs_UsingBlue2DRemovedEffcor.root", "read");
+
+    TGraphAsymmErrors* h_Comb = (TGraphAsymmErrors*) NoEffCorFile.Get("h_Comb");
+    if (!h_Comb) cout << "Missing h_Comb" << endl;
+    TMatrixD* TotalCovarianceMatrix = (TMatrixD*) NoEffCorFile.Get("TotalCovarianceMatrix");
+    TMatrixD MatrixResults = *((TMatrixD*) NoEffCorFile.Get("ResultsMatrix"));
+    TMatrixD Weights = *((TMatrixD*) NoEffCorFile.Get("Weights"));
+
+    TGraphAsymmErrors* Electron = (TGraphAsymmErrors*) NoEffCorFile.Get("Electron");
+    if (!Electron) cout << "Missing electrons" << endl;
+    TGraphAsymmErrors* Muons = (TGraphAsymmErrors*) NoEffCorFile.Get("Muons");
+    if (!Muons) cout << "Missing Muons" << endl;
+
+
+    for (size_t Obser = 0; Obser < NumObs; Obser++) {
+        double uncertaintySquarred = 0;
+        //        cout<<"test 1"<<endl;
+        for (size_t EstIndex = 0; EstIndex < NumEst; EstIndex++) {
+            if (Obser == 0)cout << "Our uncertainty for EstIndex bin" << EstIndex << " is " << sqrt(CovM_eff(EstIndex, EstIndex));
+            if (Obser == 0)cout << "    Our Weight for each bin is " << Weights(EstIndex, Obser);
+            uncertaintySquarred += Weights(EstIndex, Obser) * Weights(EstIndex, Obser) * CovM_eff(EstIndex, EstIndex);
+            if (Obser == 0)cout << "and our current uncertainty is " << sqrt(uncertaintySquarred) << endl;
+        }
+        if (Obser == 0)cout << "AND OUR UNCERTAINTY IS " << sqrt(uncertaintySquarred);
+        EffUncertainty(0, Obser) = sqrt(uncertaintySquarred);
+    }
+
+
+
+    for (size_t BinY = 0; BinY < h_Comb->GetN(); BinY++) {
+        double x1, y1;
+        h_Comb->GetPoint(BinY, x1, y1);
+        //        MatrixResults(BinY, 0) = y1;
+        MatrixResults(BinY, 3) = EffUncertainty(0, BinY);
+        cout << "For bin " << BinY << " our Eff uncertainty is " << EffUncertainty(0, BinY) << endl;
+
+        for (size_t BinX = 0; BinX < h_Comb->GetN(); BinX++) {
+
+            double x2, y2;
+
+            h_Comb->GetPoint(BinX, x2, y2);
+            (*TotalCovarianceMatrix)(BinY, BinX) = (*TotalCovarianceMatrix)(BinY, BinX) + y1 * y2 * .026 * .026;
+            (*TotalCovarianceMatrix)(BinY, BinX) = (*TotalCovarianceMatrix)(BinY, BinX) + EffUncertainty(0, BinX) * EffUncertainty(0, BinY);
+        }
+    }
+
+    if (!TotalCovarianceMatrix) cout << "Missing TotalCovarianceMatrix" << endl;
+    for (size_t binNumber = 0; binNumber < h_Comb->GetN(); binNumber++) {
+        double x, y;
+        h_Comb->GetPoint(binNumber, x, y);
+        h_Comb->SetPointEYhigh(binNumber, sqrt((*TotalCovarianceMatrix)(binNumber, binNumber)));
+        h_Comb->SetPointEYlow(binNumber, sqrt((*TotalCovarianceMatrix)(binNumber, binNumber)));
+    }
+    TFile* Finalthingy = new TFile("Results/Comb_Abs_UsingBlue2DEffFix.root", "recreate");
+    Finalthingy->cd();
+
+
+    Electron->Write("Electron");
+    Muons->Write("Muons");
+    h_Comb->Write("h_Comb");
+    MatrixResults.Write("ResultsMatrix");
+    TotalCovarianceMatrix->Write("TotalCovarianceMatrix");
+
+
+
+    Finalthingy->Write();
 }
 
 int main(int argc, char * argv[]) {
     ElectPlusMuon2D(false);
-    //    ElectPlusMuon2D(true);
-        Plotter(false);
-    //    Plotter(true);
+    ElectPlusMuon2D(false, 2);
+    Combiner();
+
+    ElectPlusMuon2D(true);
+    Plotter(false);
+    Plotter(true);
 
     return 1;
 }
