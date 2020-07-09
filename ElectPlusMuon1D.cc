@@ -460,7 +460,7 @@ void Plotter(bool DoNorm = true) {
     FinalPhiRatio->Print(Withtype.c_str());
 }
 
-void Combiner() {//HACK HACKEDY HACK HACK HAck so the story is that We don't like the eff causing a weird offset so instead we are now going to combine 2 results
+void Combiner() {//We don't like the eff causing a weird offset so instead we are now going to combine 2 results
 Int_t NumObs = nphistar;
 
     //Delete Me
