@@ -39,13 +39,7 @@ size_t nbins = nphistar;
 static const Int_t NumEst = 68;
 
 void HeapUser(double**& Array, Int_t Dimension) {
-    //    Array = (double **) malloc(Dimension * sizeof (double *));
-    //    for (Int_t YaxisBin = 0; YaxisBin < Dimension; YaxisBin++) {
-    //        Array[YaxisBin] = (double *) malloc(Dimension * sizeof (double));
-    //        for (Int_t XaxisBin = 0; XaxisBin < Dimension; XaxisBin++) {
-    //            Array[XaxisBin][YaxisBin]=0;
-    //        }
-    //    }
+
     Dimension = NumEst;
     Array = new double*[Dimension];
     for (Int_t YaxisBin = 0; YaxisBin < Dimension; YaxisBin++) {
@@ -58,19 +52,7 @@ void HeapUser(double**& Array, Int_t Dimension) {
 
 }
 
-//void CorrilationMatrixMaker(double** Array, TMatrixD CovMatrix) {
-//    for (size_t Ybin = 0; Ybin < nphistar * 2; Ybin++) {
-//        for (size_t Xbin = 0; Xbin < nphistar * 2; Xbin++) {
-//            if(CovMatrix(Xbin, Xbin)!=0&&CovMatrix(Ybin, Ybin))
-//            Array[Xbin][Ybin] = CovMatrix(Xbin, Ybin) / sqrt(CovMatrix(Xbin, Xbin) * CovMatrix(Ybin, Ybin))*(1-.000001*(Xbin!=Ybin));
-//            else{
-//                if(Xbin==Ybin) Array[Xbin][Ybin]=1;
-//                else Array[Xbin][Ybin]=0;
-//            }
-//            //Array[Ybin][Xbin] = Array[Xbin][Ybin];
-//        }
-//    }
-//}
+
 
 void CorrilationMatrixMaker(double Array[][NumEst], TMatrixD CovMatrix, bool IsQCD = false) {
     for (size_t Ybin = 0; Ybin < nphistar * (2 - IsQCD); Ybin++) {
@@ -246,12 +228,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
     }
 
 
-    //    for (Int_t BinX = 0; BinX < NumEst; BinX++) {
-    //        for (Int_t BinY = 40; BinY < NumEst; BinY++) {
-    //            printf("%.3f\t", CorM_statArray[BinX][BinY]);
-    //        }
-    //        cout << endl;
-    //    }
+
 
     symmetricMaker(CorM_statArray);
     myBlue->FillCor(0, CorM_statArray[0]);
@@ -463,16 +440,7 @@ void Plotter(bool DoNorm = true) {
 void Combiner() {//We don't like the eff causing a weird offset so instead we are now going to combine 2 results
 Int_t NumObs = nphistar;
 
-    //Delete Me
-//    TFile WithEffCorFile("Results/Comb_Abs_UsingBlue1Dffcor.root", "read");
-//
-//    
-//    TMatrixD* TotalCovarianceMatrix = (TMatrixD*) WithEffCorFile.Get("TotalCovarianceMatrix");
-//    TH1D* ChiSquared = (TH1D*) WithEffCorFile.Get("ChiSquared");
-//    TMatrixD MatrixResults = *((TMatrixD*) WithEffCorFile.Get("ResultsMatrix"));
-    //    WithEffCorFile.Close();
-    
-    
+  
     
 
     TFile NoEffCorFile("Results/Comb_Abs_UsingBlue1DRemovedEffcor.root", "read");
