@@ -38,20 +38,9 @@ const double yBins[] = {0.0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4};
 size_t nbins = nphistar;
 static const Int_t NumEst = 68;
 
-void HeapUser(double**& Array, Int_t Dimension) {
-    Dimension = NumEst;
-    Array = new double*[Dimension];
-    for (Int_t YaxisBin = 0; YaxisBin < Dimension; YaxisBin++) {
-        Array[YaxisBin] = new double[Dimension];
-        for (Int_t XaxisBin = 0; XaxisBin < Dimension; XaxisBin++) {
-
-        }
-    }
-}
 
 
-
-void CorrilationMatrixMaker(double Array[][NumEst], TMatrixD CovMatrix, bool IsQCD = false) {//have covmatix blue needs corrilationmatrix
+void CorrilationMatrixMaker(double Array[][NumEst], TMatrixD CovMatrix, bool IsQCD = false) { //have covmatix blue needs corrilationmatrix
     for (size_t Ybin = 0; Ybin < nphistar * (2 - IsQCD); Ybin++) {
         for (size_t Xbin = 0; Xbin < nphistar * (2 - IsQCD); Xbin++) {
             Array[Xbin][Ybin] = CovMatrix(Xbin, Ybin) / sqrt(CovMatrix(Xbin, Xbin) * CovMatrix(Ybin, Ybin))*(1 - .00000001 * (Xbin != Ybin));
@@ -59,12 +48,12 @@ void CorrilationMatrixMaker(double Array[][NumEst], TMatrixD CovMatrix, bool IsQ
         }
     }
     if (IsQCD)for (size_t Ybin = 0; Ybin < nphistar * (2 - IsQCD); Ybin++) {
-            for (size_t Xbin = Ybin; Xbin < nphistar * (2 - IsQCD); Xbin++) {
-                Array[Xbin][Ybin] = 0;
-                Array[Ybin][Xbin] = Array[Xbin][Ybin];
-            }
-            Array[Ybin][Ybin] = 1;
+        for (size_t Xbin = Ybin; Xbin < nphistar * (2 - IsQCD); Xbin++) {
+            Array[Xbin][Ybin] = 0;
+            Array[Ybin][Xbin] = Array[Xbin][Ybin];
         }
+        Array[Ybin][Ybin] = 1;
+    }
 }
 
 void symmetricMaker(double** Array) {
@@ -131,7 +120,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
     TMatrixD* CovM_pt = (TMatrixD*) Original.Get("CovM_pt");
     TMatrixD* CovM_lumi = (TMatrixD*) Original.Get("CovM_lumi");
 
-    for (size_t binx = 0; binx < NumEst; binx++)
+    for (size_t binx = 0; binx < NumEst; binx++) {
         for (size_t biny = 0; biny < NumEst; biny++) {
             if (binx == biny)continue;
             if (RemoveCorrilation == 0)(*CovM_stat)(binx, biny) = 0;
@@ -143,6 +132,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
             if (RemoveCorrilation == 6)(*CovM_pileup)(binx, biny) = 0;
             if (RemoveCorrilation == 7)(*CovM_pt)(binx, biny) = 0;
         }
+    }
 
 
     NamUnc[0].Format("stat");
@@ -208,7 +198,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
     }
 
     Int_t ind = 0;
-    for (Int_t i = 0; i < NumEst; i++) {//filling blue
+    for (Int_t i = 0; i < NumEst; i++) { //filling blue
         myBlue->FillEst(i, &XEst[ind]);
         ind = ind + NumUnc + 1;
     }
@@ -247,7 +237,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
     double MuonErrorSquared[NumObs];
     double CombinedErrorSquared[NumObs];
 
-    for (size_t BinNumber = 0; BinNumber < NumObs; BinNumber++) {//creating erros from cov matrix
+    for (size_t BinNumber = 0; BinNumber < NumObs; BinNumber++) { //creating erros from cov matrix
         ElectronErrorSquared[BinNumber] = AllCovs[0](BinNumber, BinNumber) + AllCovs[1](BinNumber, BinNumber) + AllCovs[2](BinNumber, BinNumber) + AllCovs[3](BinNumber, BinNumber) +
                 AllCovs[4](BinNumber, BinNumber) + AllCovs[5](BinNumber, BinNumber) + AllCovs[6](BinNumber, BinNumber) + AllCovs[7](BinNumber, BinNumber);
         size_t muonBin = BinNumber + NumObs;
@@ -256,7 +246,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
         CombinedErrorSquared[BinNumber] = (*CovarianceResults)(BinNumber, BinNumber);
     }
 
-    for (size_t BinNumber = 0; BinNumber < NumObs; BinNumber++) {//creating individual electron and muon plot from combined plot
+    for (size_t BinNumber = 0; BinNumber < NumObs; BinNumber++) { //creating individual electron and muon plot from combined plot
         double x, y;
         FullPlot->GetPoint(BinNumber, x, y);
         double RealX = (phistarBins[BinNumber] + phistarBins[BinNumber + 1]) / 2;
@@ -307,11 +297,8 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
 
     TH1D ChiSquared("ChiSquared", "ChiSquared", 1, 0, 1);
     ChiSquared.SetBinContent(1, myBlue->GetChiq());
-    //CorrilationMatrix.Write();
     ResultFile.Write();
     MatrixResults.Write("ResultsMatrix");
-
-    //    TString ListUncertainties = NamUnc[0] + "\t" + NamUnc[1] + "\t" + NamUnc[2] + "\t" + NamUnc[3] + "\t" + NamUnc[4] + "\t" + NamUnc[5] + "\t" + NamUnc[6] + "\t" + NamUnc[7] + "\tLum";
 
     delete myBlue;
     delete CovarianceResults;
@@ -416,42 +403,42 @@ void Plotter(bool DoNorm = true) {
     FinalPhiRatio->Print(Withtype.c_str());
 }
 
-void Combiner() {//We don't like the eff causing a weird offset so instead we are now going to combine 2 results
+void Combiner() { //We don't like the eff causing a weird offset so instead we are now going to combine 2 results
     Int_t NumObs = nphistar;
 
 
-    TFile NoEffCorFile("Results/Comb_Abs_UsingBlue1DRemovedEffcor.root", "read");//grabbing
+    TFile NoEffCorFile("Results/Comb_Abs_UsingBlue1DRemovedEffcor.root", "read"); //grabbing
 
-    TGraphAsymmErrors* h_Comb = (TGraphAsymmErrors*) NoEffCorFile.Get("h_Comb");//combined results
-    TGraphAsymmErrors* Electron = (TGraphAsymmErrors*) NoEffCorFile.Get("Electron");//electron results
+    TGraphAsymmErrors* h_Comb = (TGraphAsymmErrors*) NoEffCorFile.Get("h_Comb"); //combined results
+    TGraphAsymmErrors* Electron = (TGraphAsymmErrors*) NoEffCorFile.Get("Electron"); //electron results
     if (!Electron) cout << "Missing electrons" << endl;
-    TGraphAsymmErrors* Muons = (TGraphAsymmErrors*) NoEffCorFile.Get("Muons");//muon results
+    TGraphAsymmErrors* Muons = (TGraphAsymmErrors*) NoEffCorFile.Get("Muons"); //muon results
     if (!Muons) cout << "Missing Muons" << endl;
-    TH1D* ChiSquared = (TH1D*) NoEffCorFile.Get("ChiSquared");//chisquarred
+    TH1D* ChiSquared = (TH1D*) NoEffCorFile.Get("ChiSquared"); //chisquarred
     
     
-    TMatrixD* TotalCovarianceMatrix = (TMatrixD*) NoEffCorFile.Get("TotalCovarianceMatrix");//total covariane matrix
+    TMatrixD* TotalCovarianceMatrix = (TMatrixD*) NoEffCorFile.Get("TotalCovarianceMatrix"); //total covariane matrix
     TMatrixD MatrixResults = *((TMatrixD*) NoEffCorFile.Get("ResultsMatrix"));
     TMatrixD Weights = *((TMatrixD*) NoEffCorFile.Get("Weights"));
     
-    std::string OrignialFileLocation = "~/work/HomeWork/Phistar/CombineElectWithMu/EPlusMuFileV2/Comb_ForBlue_Abs_1D_Born.root";//Grabbing efficency uncertainty shit
+    std::string OrignialFileLocation = "~/work/HomeWork/Phistar/CombineElectWithMu/EPlusMuFileV2/Comb_ForBlue_Abs_1D_Born.root"; //Grabbing efficency uncertainty shit
     TFile Original(OrignialFileLocation.c_str());
     TMatrixD CovM_eff = *((TMatrixD*) Original.Get("CovM_eff"));
     TMatrixD EffUncertainty(1,NumObs);
     
-    for(size_t Obser=0;Obser<NumObs;Obser++){
+    for(size_t Obser=0; Obser<NumObs; Obser++){
         double uncertaintySquarred=0;
-        for(size_t EstIndex = 0;EstIndex<NumEst;EstIndex++ ){
-            if(Obser==0)cout<<"Our uncertainty for EstIndex bin"<< EstIndex<<" is "<<sqrt(CovM_eff(EstIndex,EstIndex));//prints all the values for the first event for sanity checking
-            if(Obser==0)cout<<"    Our Weight for each bin is "<<Weights(EstIndex,Obser) ;
-            uncertaintySquarred+=Weights(EstIndex,Obser)*Weights(EstIndex,Obser)*CovM_eff(EstIndex,EstIndex);
-            if(Obser==0)cout<<"and our current uncertainty is "<<sqrt(uncertaintySquarred)<<endl;
+        for(size_t EstIndex = 0; EstIndex<NumEst; EstIndex++){
+            if(Obser==0) cout << "Our uncertainty for EstIndex bin" << EstIndex << " is " <<sqrt(CovM_eff(EstIndex,EstIndex)); //prints all the values for the first event for sanity checking
+            if(Obser==0) cout << "    Our Weight for each bin is " << Weights(EstIndex,Obser) ;
+            uncertaintySquarred += Weights(EstIndex,Obser)*Weights(EstIndex,Obser)*CovM_eff(EstIndex,EstIndex);
+            if(Obser==0) cout << "and our current uncertainty is " << sqrt(uncertaintySquarred) << endl;
         }
-        if(Obser==0)cout<<"AND OUR UNCERTAINTY IS "<<sqrt(uncertaintySquarred);
+        if(Obser==0)cout << "AND OUR UNCERTAINTY IS " << sqrt(uncertaintySquarred);
         EffUncertainty(0,Obser)=sqrt(uncertaintySquarred);
     }
     
-    cout<<endl<<endl<<endl;
+    cout << endl << endl << endl;
     
     
     if (!h_Comb) cout << "Missing h_Comb" << endl;
@@ -459,14 +446,14 @@ void Combiner() {//We don't like the eff causing a weird offset so instead we ar
     
     if (!TotalCovarianceMatrix) cout << "Missing TotalCovarianceMatrix" << endl;
 
-    for (size_t BinY = 0; BinY < h_Comb->GetN(); BinY++) {//goes over x axis of covarnaince bins
+    for (size_t BinY = 0; BinY < h_Comb->GetN(); BinY++) { //goes over x axis of covarnaince bins
         double x1, y1;
         h_Comb->GetPoint(BinY, x1, y1);
         MatrixResults(BinY, 0) = y1;
         MatrixResults(BinY, 3) = EffUncertainty(0,BinY);
-        cout<<"For bin "<<BinY<<" our Eff uncertainty is "<<EffUncertainty(0,BinY)<<endl;
+        cout << "For bin " << BinY << " our Eff uncertainty is " << EffUncertainty(0,BinY) << endl;
         
-        for (size_t BinX = 0; BinX < h_Comb->GetN(); BinX++) {//goes over y axis
+        for (size_t BinX = 0; BinX < h_Comb->GetN(); BinX++) { //goes over y axis
             double x2, y2;
             h_Comb->GetPoint(BinX, x2, y2);
             (*TotalCovarianceMatrix)(BinY, BinX) = (*TotalCovarianceMatrix)(BinY, BinX) + y1 * y2 * .026 * .026;
@@ -491,11 +478,11 @@ void Combiner() {//We don't like the eff causing a weird offset so instead we ar
 }
 
 int main(int argc, char * argv[]) {
-    ElectPlusMuon1D(false);//not normalized
-    ElectPlusMuon1D(false, 2);//normalized with no eff uncert
+    ElectPlusMuon1D(false); //not normalized
+    ElectPlusMuon1D(false, 2); //normalized with no eff uncert
     Combiner(); //combines results
-    ElectPlusMuon1D(true);//normalized results
-    Plotter(true);//plots everything
+    ElectPlusMuon1D(true); //normalized results
+    Plotter(true); //plots everything
     Plotter(false);
     return 1;
 }
