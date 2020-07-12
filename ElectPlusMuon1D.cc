@@ -1,4 +1,4 @@
-// Standard Library
+// Combines the electron and muon group results using BLUE
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
