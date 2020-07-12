@@ -94,7 +94,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
     TString NamObs[NumObs];
     Int_t IWhichObs[NumEst];
 
-    for (size_t PhiStarBin = 0; PhiStarBin < NumObs; PhiStarBin++) {//creating names for all observables
+    for (size_t PhiStarBin = 0; PhiStarBin < NumObs; PhiStarBin++) { //creating names for all observables
         TString ElectronBinName;
         ElectronBinName.Format("Electron_Bin_%d02", PhiStarBin);
         TString MuonBinName;
@@ -121,7 +121,7 @@ void ElectPlusMuon1D(bool DoNorm = false, size_t RemoveCorrilation = -1) {
         cout << "can't find covM_tot" << endl;
         return;
     }
-    TMatrixD* CovM_stat = (TMatrixD*) Original.Get("CovM_stat");//grabbing all the cov matrix
+    TMatrixD* CovM_stat = (TMatrixD*) Original.Get("CovM_stat"); //grabbing all the cov matrix
     TMatrixD* CovM_mcstat = (TMatrixD*) Original.Get("Cov_mcstat");
     TMatrixD* CovM_eff = (TMatrixD*) Original.Get("CovM_eff");
     TMatrixD* CovM_bg_tt = (TMatrixD*) Original.Get("CovM_bg_tt");
